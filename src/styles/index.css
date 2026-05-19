@@ -163,7 +163,10 @@ a {
   background-repeat: no-repeat;
   background-position: center bottom;
   filter: saturate(0.8) contrast(1.02) brightness(0.82);
-  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    transform 1800ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 1100ms ease,
+    filter 1800ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .hero-bg--back {
@@ -203,6 +206,9 @@ a {
     radial-gradient(circle at center, rgba(5, 5, 7, 0.1) 0%, rgba(5, 5, 7, 0.1) 22%, rgba(5, 5, 7, 0.06) 44%, rgba(5, 5, 7, 0.16) 68%, rgba(5, 5, 7, 0.54) 100%),
     linear-gradient(90deg, rgba(4, 4, 6, 0.5) 0%, rgba(4, 4, 6, 0.12) 20%, rgba(4, 4, 6, 0.12) 80%, rgba(4, 4, 6, 0.5) 100%),
     linear-gradient(180deg, rgba(4, 4, 6, 0.34) 0%, transparent 18%, transparent 82%, rgba(4, 4, 6, 0.46) 100%);
+  transition:
+    opacity 1200ms ease,
+    background 1800ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .hero-grain {
@@ -220,7 +226,9 @@ a {
   inset: 50% auto auto 50%;
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    transform 1200ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 900ms ease;
 }
 
 .hero-circle--outer {
@@ -249,7 +257,9 @@ a {
   transform:
     translate(-50%, -50%)
     translate(calc(var(--parallax-x) * 4px), calc(var(--parallax-y) * 3px));
-  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    transform 1200ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 900ms ease;
 }
 
 .hero-orbit--outer {
@@ -396,6 +406,11 @@ a {
   transition: opacity 160ms ease, color 160ms ease;
 }
 
+.site-header__nav a.is-active {
+  opacity: 1;
+  color: rgba(236, 229, 220, 0.98);
+}
+
 .site-header__nav a:hover,
 .site-header__nav a:focus-visible {
   opacity: 1;
@@ -422,6 +437,10 @@ a {
   text-align: center;
   min-height: 100%;
   padding: 36px 24px 34px;
+  transition:
+    opacity 700ms ease,
+    transform 1200ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 700ms ease;
 }
 
 .hero-mark {
@@ -518,6 +537,219 @@ a {
 .hero-subtitle--visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+.ladder-page {
+  width: min(100%, 920px);
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  text-align: center;
+  padding: 48px 24px;
+  opacity: 0;
+  transform: translateY(22px);
+  animation: ladder-fade-in 760ms 260ms ease forwards;
+}
+
+.ladder-page__eyebrow {
+  font-family: 'Cinzel', serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(198, 190, 179, 0.62);
+}
+
+.ladder-page h1 {
+  margin: 0;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(3rem, 6vw, 5rem);
+  line-height: 0.88;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(228, 221, 214, 0.96);
+  text-shadow: 0 18px 36px rgba(0, 0, 0, 0.56);
+}
+
+.ladder-page p {
+  width: min(100%, 580px);
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: rgba(199, 192, 183, 0.78);
+}
+
+.tasks-page {
+  width: min(100%, 1040px);
+  display: grid;
+  gap: 34px;
+  justify-items: center;
+  padding: 42px 24px;
+  opacity: 0;
+  transform: translateY(22px);
+  animation: ladder-fade-in 760ms 260ms ease forwards;
+}
+
+.tasks-page__head {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  text-align: center;
+}
+
+.tasks-page__eyebrow {
+  font-family: 'Cinzel', serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(198, 190, 179, 0.62);
+}
+
+.tasks-page h1 {
+  margin: 0;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2.8rem, 5.6vw, 4.8rem);
+  line-height: 0.9;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(228, 221, 214, 0.96);
+  text-shadow: 0 18px 36px rgba(0, 0, 0, 0.56);
+}
+
+.tasks-page__head p {
+  width: min(100%, 640px);
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: rgba(199, 192, 183, 0.76);
+}
+
+.tasks-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.task-card {
+  position: relative;
+  min-height: 220px;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 22px 22px 24px;
+  border: 1px solid rgba(196, 189, 180, 0.12);
+  background:
+    linear-gradient(180deg, rgba(19, 19, 24, 0.88) 0%, rgba(10, 10, 14, 0.72) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(227, 220, 210, 0.05),
+    0 18px 40px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(6px);
+}
+
+.task-card::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgba(183, 176, 167, 0.06);
+  pointer-events: none;
+}
+
+.task-card__index {
+  font-family: 'Cinzel', serif;
+  font-size: 0.92rem;
+  letter-spacing: 0.26em;
+  color: rgba(176, 187, 217, 0.62);
+}
+
+.task-card h2 {
+  margin: 0;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2rem;
+  line-height: 0.95;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(226, 219, 211, 0.95);
+}
+
+.task-card p {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.7;
+  color: rgba(198, 191, 182, 0.78);
+}
+
+.app-shell--transitioning .hero-content {
+  pointer-events: none;
+}
+
+.app-shell--transitioning-to-inner .hero-content {
+  opacity: 0;
+  transform: translateY(-16px) scale(0.98);
+  filter: blur(4px);
+}
+
+.app-shell--transitioning-to-inner .hero-bg--back,
+.app-shell--inner-view .hero-bg--back {
+  transform:
+    translate(calc(var(--parallax-x) * -1px), calc(var(--parallax-y) * -1px))
+    scale(1.24);
+  filter: saturate(0.72) contrast(1.08) brightness(0.52);
+}
+
+.app-shell--transitioning-to-inner .hero-bg--figure,
+.app-shell--transitioning-to-inner .hero-bg--front,
+.app-shell--transitioning-to-inner .hero-circle,
+.app-shell--transitioning-to-inner .hero-orbit,
+.app-shell--transitioning-to-inner .hero-grain {
+  opacity: 0;
+}
+
+.app-shell--transitioning-to-inner .hero-bg--figure {
+  transform:
+    translate(calc(var(--parallax-x) * 18px), calc(var(--parallax-y) * 12px))
+    scale(1.08);
+}
+
+.app-shell--transitioning-to-inner .hero-bg--front {
+  transform:
+    translate(calc(var(--parallax-x) * 22px), calc(var(--parallax-y) * 14px))
+    scale(1.1);
+}
+
+.app-shell--inner-view .hero-bg--figure,
+.app-shell--inner-view .hero-bg--front,
+.app-shell--inner-view .hero-circle,
+.app-shell--inner-view .hero-orbit,
+.app-shell--inner-view .hero-grain {
+  opacity: 0;
+}
+
+.app-shell--inner-view .hero-vignette {
+  background:
+    radial-gradient(circle at center, rgba(5, 5, 7, 0.22) 0%, rgba(5, 5, 7, 0.14) 32%, rgba(5, 5, 7, 0.2) 66%, rgba(5, 5, 7, 0.62) 100%),
+    linear-gradient(180deg, rgba(4, 4, 6, 0.4) 0%, transparent 20%, transparent 80%, rgba(4, 4, 6, 0.54) 100%);
+}
+
+@keyframes ladder-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 920px) {
+  .tasks-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .task-card {
+    min-height: auto;
+  }
 }
 
 .hero-cta {
