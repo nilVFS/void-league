@@ -12,6 +12,102 @@ const navigationItems = [
 
 const SCENE_TRANSITION_MS = 1800;
 
+const TASK_CATEGORIES = [
+  { key: 'all', label: 'Все' },
+  { key: 'start', label: 'Старт' },
+  { key: 'mapping', label: 'Карты' },
+  { key: 'economy', label: 'Экономика' },
+  { key: 'bosses', label: 'Боссы' },
+  { key: 'league', label: 'Лига' },
+];
+
+const TASKS = [
+  {
+    id: 'first-circle',
+    title: 'Первый круг',
+    category: 'start',
+    categoryLabel: 'Старт',
+    description: 'Закрыть все акты в первый игровой день хотя бы одним участником лиги.',
+  },
+  {
+    id: 'night-watch',
+    title: 'Ночной дозор',
+    category: 'start',
+    categoryLabel: 'Старт',
+    description: 'Собрать минимум пятерых живых участников онлайн в первые три часа после старта.',
+  },
+  {
+    id: 'altar-of-maps',
+    title: 'Алтарь карт',
+    category: 'mapping',
+    categoryLabel: 'Карты',
+    description: 'Открыть и зачистить первые десять карт белого тира в составе лиги без внешней помощи.',
+  },
+  {
+    id: 'atlas-spark',
+    title: 'Искра атласа',
+    category: 'mapping',
+    categoryLabel: 'Карты',
+    description: 'Закрыть первую желтую карту и зафиксировать, кто первым дотянул атлас до нового тира.',
+  },
+  {
+    id: 'black-vault',
+    title: 'Черная казна',
+    category: 'economy',
+    categoryLabel: 'Экономика',
+    description: 'Собрать первый общий пул ценных валютных дропов и отметить его как фонд сезона.',
+  },
+  {
+    id: 'first-trade',
+    title: 'Первая сделка',
+    category: 'economy',
+    categoryLabel: 'Экономика',
+    description: 'Заключить первую внутрилиговую сделку, которая реально помогает ускорить чей-то билд.',
+  },
+  {
+    id: 'abyss-oath',
+    title: 'Клятва бездне',
+    category: 'league',
+    categoryLabel: 'Лига',
+    description: 'Собрать первый ценный дроп сезона и зафиксировать его как общий трофей лиги.',
+  },
+  {
+    id: 'closed-circle',
+    title: 'Закрытый круг',
+    category: 'league',
+    categoryLabel: 'Лига',
+    description: 'Пройти стартовую неделю без добора случайных людей в состав лиги.',
+  },
+  {
+    id: 'first-blood',
+    title: 'Первая кровь',
+    category: 'bosses',
+    categoryLabel: 'Боссы',
+    description: 'Убить первого значимого босса эндгейма силами лиги и сохранить его как milestone сезона.',
+  },
+  {
+    id: 'bone-throne',
+    title: 'Костяной трон',
+    category: 'bosses',
+    categoryLabel: 'Боссы',
+    description: 'Закрыть сложный бой без вайпа всей пачки и отметить состав, который это сделал.',
+  },
+  {
+    id: 'iron-discipline',
+    title: 'Железная дисциплина',
+    category: 'league',
+    categoryLabel: 'Лига',
+    description: 'Собрать единый список билдов лиги, чтобы не дублировать ключевые роли и не терять темп.',
+  },
+  {
+    id: 'ashen-line',
+    title: 'Пепельная линия',
+    category: 'mapping',
+    categoryLabel: 'Карты',
+    description: 'Довести хотя бы одного участника до стабильного фарма карт без провала по выживаемости.',
+  },
+];
+
 const RUNES = ['ᚠ', 'ᚢ', 'ᚦ', 'ᚨ', 'ᚱ', 'ᚲ', 'ᚷ', 'ᚹ', 'ᚺ', 'ᚾ', 'ᛁ', 'ᛃ', 'ᛇ', 'ᛈ', 'ᛉ', 'ᛋ', 'ᛏ', 'ᛒ', 'ᛖ', 'ᛗ', 'ᛚ', 'ᛝ', 'ᛟ', 'ᛞ'];
 
 function buildInitialRunes(target) {
@@ -89,6 +185,8 @@ export default function App() {
   const transitionTimeoutRef = useRef(null);
   const [activeView, setActiveView] = useState('home');
   const [transitionTarget, setTransitionTarget] = useState(null);
+  const [taskCategory, setTaskCategory] = useState('all');
+  const [taskQuery, setTaskQuery] = useState('');
   const titleTop = useRuneScramble('ПОЗНАЙ', {
     delay: 250,
     duration: 2150,
@@ -199,6 +297,28 @@ export default function App() {
     return classes.join(' ');
   }, [activeView, transitionTarget]);
 
+  const showHeroPage = activeView === 'home';
+  const showLadderPage = activeView === 'ladder';
+  const showTasksPage = activeView === 'tasks';
+  const showFeaturesPage = activeView === 'features';
+  const showRulesPage = activeView === 'rules';
+  const showLoginPage = activeView === 'login';
+  const normalizedTaskQuery = taskQuery.trim().toLowerCase();
+  const filteredTasks = useMemo(() => TASKS.filter((task) => {
+    const matchesCategory = taskCategory === 'all' || task.category === taskCategory;
+    const haystack = `${task.title} ${task.description} ${task.categoryLabel}`.toLowerCase();
+    const matchesQuery = !normalizedTaskQuery || haystack.includes(normalizedTaskQuery);
+
+    return matchesCategory && matchesQuery;
+  }), [normalizedTaskQuery, taskCategory]);
+  const groupedTasks = useMemo(() => TASK_CATEGORIES
+    .filter((category) => category.key !== 'all')
+    .map((category) => ({
+      ...category,
+      items: filteredTasks.filter((task) => task.category === category.key),
+    }))
+    .filter((group) => group.items.length > 0), [filteredTasks]);
+
   return (
     <div className={shellClassName} ref={shellRef}>
       <CustomCursor />
@@ -227,59 +347,116 @@ export default function App() {
       />
 
       <main className="hero-stage">
-        {activeView === 'ladder' && !transitionTarget ? (
+        {showLadderPage ? (
           <section className="ladder-page">
             <span className="ladder-page__eyebrow">Ладдер</span>
             <h1>Зал призванных</h1>
             <p>Здесь будет рейтинг, прогресс и имена тех, кто пережил ритуал старта.</p>
           </section>
-        ) : activeView === 'tasks' && !transitionTarget ? (
+        ) : showTasksPage ? (
           <section className="tasks-page">
             <div className="tasks-page__head">
               <span className="tasks-page__eyebrow">Задачи</span>
               <h1>Ритуалы сезона</h1>
-              <p>Пока это черновой список целей для лиги: можно будет расширить его в полноценные челленджи с наградами и статусами.</p>
+              <p>Когда задач станет очень много, здесь должно быть тупо понятно: нашел категорию, вбил слово, открыл нужный блок и пошел делать.</p>
             </div>
 
-            <div className="tasks-grid">
-              <article className="task-card">
-                <span className="task-card__index">I</span>
-                <h2>Первый круг</h2>
-                <p>Закрыть все акты в первый игровой день хотя бы одним участником лиги.</p>
-              </article>
+            <div className="tasks-toolbar">
+              <label className="tasks-search">
+                <span className="tasks-search__label">Поиск</span>
+                <input
+                  type="text"
+                  placeholder="Например: карты, старт, дроп, босс..."
+                  value={taskQuery}
+                  onChange={(event) => setTaskQuery(event.target.value)}
+                />
+              </label>
 
-              <article className="task-card">
-                <span className="task-card__index">II</span>
-                <h2>Алтарь карт</h2>
-                <p>Открыть и зачистить первые десять карт белого тира в составе лиги без внешней помощи.</p>
-              </article>
+              <div className="tasks-filters" aria-label="Категории задач">
+                {TASK_CATEGORIES.map((category) => {
+                  const count = category.key === 'all'
+                    ? TASKS.length
+                    : TASKS.filter((task) => task.category === category.key).length;
 
-              <article className="task-card">
-                <span className="task-card__index">III</span>
-                <h2>Клятва бездне</h2>
-                <p>Собрать первый ценный дроп сезона и зафиксировать его как общий трофей лиги.</p>
-              </article>
+                  return (
+                    <button
+                      key={category.key}
+                      type="button"
+                      className={taskCategory === category.key ? 'is-active' : undefined}
+                      onClick={() => setTaskCategory(category.key)}
+                    >
+                      <span>{category.label}</span>
+                      <strong>{count}</strong>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            <div className="tasks-summary">
+              <span>Найдено задач: {filteredTasks.length}</span>
+              {(taskCategory !== 'all' || normalizedTaskQuery) ? (
+                <button
+                  type="button"
+                  className="tasks-summary__reset"
+                  onClick={() => {
+                    setTaskCategory('all');
+                    setTaskQuery('');
+                  }}
+                >
+                  Сбросить фильтры
+                </button>
+              ) : null}
+            </div>
+
+            {groupedTasks.length ? (
+              <div className="tasks-groups">
+                {groupedTasks.map((group) => (
+                  <section key={group.key} className="task-group">
+                    <div className="task-group__head">
+                      <h2>{group.label}</h2>
+                      <span>{group.items.length}</span>
+                    </div>
+
+                    <div className="tasks-grid">
+                      {group.items.map((task, index) => (
+                        <article key={task.id} className="task-card">
+                          <span className="task-card__index">{String(index + 1).padStart(2, '0')}</span>
+                          <span className="task-card__category">{task.categoryLabel}</span>
+                          <h3>{task.title}</h3>
+                          <p>{task.description}</p>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <div className="tasks-empty">
+                <h2>Ничего не найдено</h2>
+                <p>Попробуй другую категорию или убери часть слов из поиска.</p>
+              </div>
+            )}
           </section>
-        ) : activeView === 'features' && !transitionTarget ? (
+        ) : showFeaturesPage ? (
           <section className="ladder-page">
             <span className="ladder-page__eyebrow">Особенности</span>
             <h1>Условия ритуала</h1>
             <p>Здесь будет блок про формат лиги, правила входа, общий старт и все ключевые ограничения сезона.</p>
           </section>
-        ) : activeView === 'rules' && !transitionTarget ? (
+        ) : showRulesPage ? (
           <section className="ladder-page">
             <span className="ladder-page__eyebrow">Правила</span>
             <h1>Кодекс круга</h1>
             <p>Здесь потом соберем обязательные правила поведения, спорные кейсы и порядок участия в закрытом составе.</p>
           </section>
-        ) : activeView === 'login' && !transitionTarget ? (
+        ) : showLoginPage ? (
           <section className="ladder-page">
             <span className="ladder-page__eyebrow">Войти</span>
             <h1>Вход в святилище</h1>
             <p>Эта страница будет точкой входа в закрытую часть сайта: профиль, состав, доступы и внутренние разделы лиги.</p>
           </section>
-        ) : (
+        ) : showHeroPage ? (
           <section className="hero-content">
             <div className="hero-mark">
               <span className="hero-mark__top">Path of Exile II</span>
@@ -317,7 +494,7 @@ export default function App() {
               <span className="hero-cta__label">Вступить</span>
             </a>
           </section>
-        )}
+        ) : null}
       </main>
     </div>
   );
