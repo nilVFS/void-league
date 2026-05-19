@@ -193,8 +193,8 @@ a {
   transform:
     translate(calc(var(--parallax-x) * 14px), calc(var(--parallax-y) * 8px))
     scale(1.025);
-  filter: saturate(0.88) brightness(0.84);
-  opacity: 0.88;
+  filter: grayscale(0.42) saturate(0.28) hue-rotate(18deg) brightness(0.62) contrast(1.04);
+  opacity: 0.76;
 }
 
 .hero-vignette {
