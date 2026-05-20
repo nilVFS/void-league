@@ -4,7 +4,7 @@ import { Header } from './components/Header';
 
 const navigationItems = [
   { label: 'Ладдер', href: '#ladder', page: 'ladder' },
-  { label: 'Особенности', href: '#features', page: 'features' },
+  { label: 'Участники', href: '#participants', page: 'participants' },
   { label: 'Правила', href: '#rules', page: 'rules' },
   { label: 'Задачи', href: '#tasks', page: 'tasks' },
   { label: 'Войти', href: '#login', page: 'login' },
@@ -187,6 +187,7 @@ export default function App() {
   const [transitionTarget, setTransitionTarget] = useState(null);
   const [taskCategory, setTaskCategory] = useState('all');
   const [taskQuery, setTaskQuery] = useState('');
+  const [authMode, setAuthMode] = useState('login');
   const titleTop = useRuneScramble('ПОЗНАЙ', {
     delay: 250,
     duration: 2150,
@@ -300,7 +301,7 @@ export default function App() {
   const showHeroPage = activeView === 'home';
   const showLadderPage = activeView === 'ladder';
   const showTasksPage = activeView === 'tasks';
-  const showFeaturesPage = activeView === 'features';
+  const showParticipantsPage = activeView === 'participants';
   const showRulesPage = activeView === 'rules';
   const showLoginPage = activeView === 'login';
   const normalizedTaskQuery = taskQuery.trim().toLowerCase();
@@ -438,11 +439,33 @@ export default function App() {
               </div>
             )}
           </section>
-        ) : showFeaturesPage ? (
-          <section className="ladder-page">
-            <span className="ladder-page__eyebrow">Особенности</span>
-            <h1>Условия ритуала</h1>
-            <p>Здесь будет блок про формат лиги, правила входа, общий старт и все ключевые ограничения сезона.</p>
+        ) : showParticipantsPage ? (
+          <section className="participants-page">
+            <div className="participants-page__head">
+              <span className="ladder-page__eyebrow">Участники</span>
+              <h1>Круг призванных</h1>
+              <p>Здесь будет основной состав лиги, роли, ссылки и все, что помогает быстро понять, кто есть кто внутри закрытого круга.</p>
+            </div>
+
+            <div className="participants-grid">
+              <article className="participant-card">
+                <span className="participant-card__role">Организатор</span>
+                <h2>Основатель лиги</h2>
+                <p>Этот слот закреплен за тобой. Здесь потом можно будет показать ник, роль и основные ссылки.</p>
+              </article>
+
+              <article className="participant-card">
+                <span className="participant-card__role">Участник</span>
+                <h2>Место свободно</h2>
+                <p>Слот под игрока старта: основной билд, роль в пати и ссылка на профиль появятся здесь.</p>
+              </article>
+
+              <article className="participant-card">
+                <span className="participant-card__role">Участник</span>
+                <h2>Место свободно</h2>
+                <p>Еще один слот под будущий состав, чтобы позже можно было превратить это в полноценный ростер.</p>
+              </article>
+            </div>
           </section>
         ) : showRulesPage ? (
           <section className="ladder-page">
@@ -451,10 +474,83 @@ export default function App() {
             <p>Здесь потом соберем обязательные правила поведения, спорные кейсы и порядок участия в закрытом составе.</p>
           </section>
         ) : showLoginPage ? (
-          <section className="ladder-page">
-            <span className="ladder-page__eyebrow">Войти</span>
-            <h1>Вход в святилище</h1>
-            <p>Эта страница будет точкой входа в закрытую часть сайта: профиль, состав, доступы и внутренние разделы лиги.</p>
+          <section className="auth-page">
+            <div className="auth-page__head">
+              <span className="ladder-page__eyebrow">Войти</span>
+              <h1>Вход в святилище</h1>
+              <p>Пока без бэкенда, но уже с понятной формой: вход для своих и регистрация для новых участников лиги.</p>
+            </div>
+
+            <div className="auth-card">
+              <div className="auth-tabs" aria-label="Переключение формы входа">
+                <button
+                  type="button"
+                  className={authMode === 'login' ? 'is-active' : undefined}
+                  onClick={() => setAuthMode('login')}
+                >
+                  Вход
+                </button>
+                <button
+                  type="button"
+                  className={authMode === 'register' ? 'is-active' : undefined}
+                  onClick={() => setAuthMode('register')}
+                >
+                  Регистрация
+                </button>
+              </div>
+
+              {authMode === 'login' ? (
+                <form className="auth-form">
+                  <label className="auth-field">
+                    <span>Почта или ник</span>
+                    <input type="text" placeholder="Например: exile@void.ru" />
+                  </label>
+
+                  <label className="auth-field">
+                    <span>Пароль</span>
+                    <input type="password" placeholder="Введите пароль" />
+                  </label>
+
+                  <div className="auth-form__row">
+                    <label className="auth-check">
+                      <input type="checkbox" />
+                      <span>Запомнить меня</span>
+                    </label>
+                    <a href="#forgot">Забыли пароль?</a>
+                  </div>
+
+                  <button type="submit" className="auth-submit">
+                    Войти в лигу
+                  </button>
+                </form>
+              ) : (
+                <form className="auth-form">
+                  <label className="auth-field">
+                    <span>Ник</span>
+                    <input type="text" placeholder="Как тебя звать в лиге" />
+                  </label>
+
+                  <label className="auth-field">
+                    <span>Почта</span>
+                    <input type="email" placeholder="name@example.com" />
+                  </label>
+
+                  <label className="auth-field">
+                    <span>Пароль</span>
+                    <input type="password" placeholder="Придумай пароль" />
+                  </label>
+
+                  <label className="auth-field">
+                    <span>Повтори пароль</span>
+                    <input type="password" placeholder="Еще раз тот же пароль" />
+                  </label>
+
+                  <button type="submit" className="auth-submit">
+                    Создать доступ
+                  </button>
+                </form>
+              )}
+            </div>
           </section>
         ) : showHeroPage ? (
           <section className="hero-content">
