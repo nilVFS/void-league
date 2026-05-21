@@ -1,11 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 
-const TRAIL_COUNT = 10;
-
 export function CustomCursor() {
   const cursorRef = useRef(null);
   const layerRef = useRef(null);
-  const trailRefs = useRef([]);
 
   useEffect(() => {
     if (!window.matchMedia('(pointer: fine)').matches) {
@@ -15,10 +12,6 @@ export function CustomCursor() {
     let frameId;
     const target = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     const current = { x: target.x, y: target.y };
-    const trail = Array.from({ length: TRAIL_COUNT }, () => ({
-      x: target.x,
-      y: target.y,
-    }));
 
     const handleMove = (event) => {
       target.x = event.clientX;
@@ -31,26 +24,12 @@ export function CustomCursor() {
     };
 
     const animate = () => {
-      current.x += (target.x - current.x) * 0.18;
-      current.y += (target.y - current.y) * 0.18;
+      current.x = target.x;
+      current.y = target.y;
 
       if (cursorRef.current) {
-        cursorRef.current.style.transform = `translate3d(${current.x}px, ${current.y}px, 0) translate(-50%, -50%)`;
+        cursorRef.current.style.transform = `translate3d(${current.x}px, ${current.y}px, 0)`;
       }
-
-      trail.forEach((point, index) => {
-        const source = index === 0 ? current : trail[index - 1];
-
-        point.x += (source.x - point.x) * 0.16;
-        point.y += (source.y - point.y) * 0.16;
-
-        const trailNode = trailRefs.current[index];
-
-        if (trailNode) {
-          trailNode.style.transform = `translate3d(${point.x}px, ${point.y}px, 0) translate(-50%, -50%) scale(${1 - index * 0.055})`;
-          trailNode.style.opacity = `${0.42 - index * 0.03}`;
-        }
-      });
 
       frameId = window.requestAnimationFrame(animate);
     };
@@ -70,24 +49,8 @@ export function CustomCursor() {
   return (
     <div className="custom-cursor-layer" ref={layerRef} aria-hidden="true">
       <div className="custom-cursor" ref={cursorRef}>
-        <span className="custom-cursor__ring">
-          <span className="custom-cursor__core" />
-        </span>
+        <img className="custom-cursor__image" src="/media/cursor-theme.png" alt="" />
       </div>
-
-      {Array.from({ length: TRAIL_COUNT }).map((_, index) => (
-        <div
-          key={`sigil-trail-${index}`}
-          className="custom-cursor-echo"
-          ref={(node) => {
-            trailRefs.current[index] = node;
-          }}
-        >
-          <span className="custom-cursor-echo__ring">
-            <span className="custom-cursor-echo__core" />
-          </span>
-        </div>
-      ))}
     </div>
   );
 }

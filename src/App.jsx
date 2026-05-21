@@ -11,6 +11,8 @@ const navigationItems = [
 ];
 
 const SCENE_TRANSITION_MS = 1800;
+const AUTH_USERS_STORAGE_KEY = 'league-poe.auth.users';
+const AUTH_SESSION_STORAGE_KEY = 'league-poe.auth.session';
 
 const TASK_CATEGORIES = [
   { key: 'all', label: 'Все' },
@@ -27,6 +29,7 @@ const TASKS = [
     title: 'Первый круг',
     category: 'start',
     categoryLabel: 'Старт',
+    points: 120,
     description: 'Закрыть все акты в первый игровой день хотя бы одним участником лиги.',
   },
   {
@@ -34,6 +37,7 @@ const TASKS = [
     title: 'Ночной дозор',
     category: 'start',
     categoryLabel: 'Старт',
+    points: 90,
     description: 'Собрать минимум пятерых живых участников онлайн в первые три часа после старта.',
   },
   {
@@ -41,6 +45,7 @@ const TASKS = [
     title: 'Алтарь карт',
     category: 'mapping',
     categoryLabel: 'Карты',
+    points: 70,
     description: 'Открыть и зачистить первые десять карт белого тира в составе лиги без внешней помощи.',
   },
   {
@@ -48,6 +53,7 @@ const TASKS = [
     title: 'Искра атласа',
     category: 'mapping',
     categoryLabel: 'Карты',
+    points: 110,
     description: 'Закрыть первую желтую карту и зафиксировать, кто первым дотянул атлас до нового тира.',
   },
   {
@@ -55,6 +61,7 @@ const TASKS = [
     title: 'Черная казна',
     category: 'economy',
     categoryLabel: 'Экономика',
+    points: 95,
     description: 'Собрать первый общий пул ценных валютных дропов и отметить его как фонд сезона.',
   },
   {
@@ -62,6 +69,7 @@ const TASKS = [
     title: 'Первая сделка',
     category: 'economy',
     categoryLabel: 'Экономика',
+    points: 60,
     description: 'Заключить первую внутрилиговую сделку, которая реально помогает ускорить чей-то билд.',
   },
   {
@@ -69,6 +77,7 @@ const TASKS = [
     title: 'Клятва бездне',
     category: 'league',
     categoryLabel: 'Лига',
+    points: 100,
     description: 'Собрать первый ценный дроп сезона и зафиксировать его как общий трофей лиги.',
   },
   {
@@ -76,6 +85,7 @@ const TASKS = [
     title: 'Закрытый круг',
     category: 'league',
     categoryLabel: 'Лига',
+    points: 140,
     description: 'Пройти стартовую неделю без добора случайных людей в состав лиги.',
   },
   {
@@ -83,6 +93,7 @@ const TASKS = [
     title: 'Первая кровь',
     category: 'bosses',
     categoryLabel: 'Боссы',
+    points: 130,
     description: 'Убить первого значимого босса эндгейма силами лиги и сохранить его как milestone сезона.',
   },
   {
@@ -90,6 +101,7 @@ const TASKS = [
     title: 'Костяной трон',
     category: 'bosses',
     categoryLabel: 'Боссы',
+    points: 160,
     description: 'Закрыть сложный бой без вайпа всей пачки и отметить состав, который это сделал.',
   },
   {
@@ -97,6 +109,7 @@ const TASKS = [
     title: 'Железная дисциплина',
     category: 'league',
     categoryLabel: 'Лига',
+    points: 80,
     description: 'Собрать единый список билдов лиги, чтобы не дублировать ключевые роли и не терять темп.',
   },
   {
@@ -104,6 +117,7 @@ const TASKS = [
     title: 'Пепельная линия',
     category: 'mapping',
     categoryLabel: 'Карты',
+    points: 75,
     description: 'Довести хотя бы одного участника до стабильного фарма карт без провала по выживаемости.',
   },
 ];
@@ -180,6 +194,57 @@ function useRuneScramble(target, options = {}) {
   return { text, isDone };
 }
 
+function readStoredUsers() {
+  try {
+    const raw = window.localStorage.getItem(AUTH_USERS_STORAGE_KEY);
+
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredUsers(users) {
+  window.localStorage.setItem(AUTH_USERS_STORAGE_KEY, JSON.stringify(users));
+}
+
+function readStoredSession() {
+  try {
+    const raw = window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredSession(session) {
+  if (!session) {
+    window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
+}
+
+function normalizeUser(user) {
+  return {
+    ...user,
+    completedTaskIds: Array.isArray(user.completedTaskIds) ? user.completedTaskIds : [],
+  };
+}
+
+function getTaskPoints(taskIds) {
+  return taskIds.reduce((total, taskId) => {
+    const task = TASKS.find((item) => item.id === taskId);
+    return total + (task?.points ?? 0);
+  }, 0);
+}
+
 export default function App() {
   const shellRef = useRef(null);
   const transitionTimeoutRef = useRef(null);
@@ -188,6 +253,15 @@ export default function App() {
   const [taskCategory, setTaskCategory] = useState('all');
   const [taskQuery, setTaskQuery] = useState('');
   const [authMode, setAuthMode] = useState('login');
+  const [authUsers, setAuthUsers] = useState([]);
+  const [sessionUser, setSessionUser] = useState(null);
+  const [authError, setAuthError] = useState('');
+  const [loginForm, setLoginForm] = useState({ nickname: '', password: '' });
+  const [registerForm, setRegisterForm] = useState({
+    nickname: '',
+    password: '',
+    confirmPassword: '',
+  });
   const titleTop = useRuneScramble('ПОЗНАЙ', {
     delay: 250,
     duration: 2150,
@@ -245,6 +319,12 @@ export default function App() {
 
   useEffect(() => () => {
     window.clearTimeout(transitionTimeoutRef.current);
+  }, []);
+
+  useEffect(() => {
+    setAuthUsers(readStoredUsers().map(normalizeUser));
+    const storedSession = readStoredSession();
+    setSessionUser(storedSession ? normalizeUser(storedSession) : null);
   }, []);
 
   const startSceneTransition = (nextView) => {
@@ -319,6 +399,135 @@ export default function App() {
       items: filteredTasks.filter((task) => task.category === category.key),
     }))
     .filter((group) => group.items.length > 0), [filteredTasks]);
+  const completedTaskIds = sessionUser?.completedTaskIds ?? [];
+  const completedTasksCount = completedTaskIds.length;
+  const completedTasksPoints = getTaskPoints(completedTaskIds);
+  const ladderEntries = useMemo(() => authUsers
+    .map((user) => {
+      const normalizedUser = normalizeUser(user);
+
+      return {
+        ...normalizedUser,
+        score: getTaskPoints(normalizedUser.completedTaskIds),
+      };
+    })
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+
+      if (right.completedTaskIds.length !== left.completedTaskIds.length) {
+        return right.completedTaskIds.length - left.completedTaskIds.length;
+      }
+
+      return left.nickname.localeCompare(right.nickname, 'ru');
+    }), [authUsers]);
+
+  const handleLoginInputChange = (field, value) => {
+    setLoginForm((current) => ({ ...current, [field]: value }));
+    setAuthError('');
+  };
+
+  const handleRegisterInputChange = (field, value) => {
+    setRegisterForm((current) => ({ ...current, [field]: value }));
+    setAuthError('');
+  };
+
+  const handleLoginSubmit = (event) => {
+    event.preventDefault();
+
+    const nickname = loginForm.nickname.trim().toLowerCase();
+    const password = loginForm.password;
+    const user = authUsers.find((entry) => entry.nickname.toLowerCase() === nickname);
+
+    if (!user || user.password !== password) {
+      setAuthError('Не нашли такого пользователя или пароль не совпадает.');
+      return;
+    }
+
+    const normalizedUser = normalizeUser(user);
+    setSessionUser(normalizedUser);
+    writeStoredSession(normalizedUser);
+    setAuthError('');
+    setLoginForm({ nickname: '', password: '' });
+  };
+
+  const handleRegisterSubmit = (event) => {
+    event.preventDefault();
+
+    const nickname = registerForm.nickname.trim();
+    const password = registerForm.password;
+    const confirmPassword = registerForm.confirmPassword;
+
+    if (!nickname || !password) {
+      setAuthError('Заполни логин и пароль.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setAuthError('Пароли не совпадают.');
+      return;
+    }
+
+    if (authUsers.some((user) => user.nickname.toLowerCase() === nickname.toLowerCase())) {
+      setAuthError('Пользователь с таким логином уже существует.');
+      return;
+    }
+
+    const nextUser = {
+      id: `user-${Date.now()}`,
+      nickname,
+      password,
+      role: 'Участник',
+      status: 'Допуск открыт',
+      note: 'Локальный профиль без бэкенда.',
+      completedTaskIds: [],
+    };
+
+    const nextUsers = [...authUsers, nextUser];
+    setAuthUsers(nextUsers);
+    writeStoredUsers(nextUsers);
+    setSessionUser(nextUser);
+    writeStoredSession(nextUser);
+    setAuthError('');
+    setRegisterForm({
+      nickname: '',
+      password: '',
+      confirmPassword: '',
+    });
+  };
+
+  const handleLogout = () => {
+    setSessionUser(null);
+    writeStoredSession(null);
+  };
+
+  const toggleTaskCompletion = (taskId) => {
+    if (!sessionUser) {
+      return;
+    }
+
+    const hasTask = sessionUser.completedTaskIds.includes(taskId);
+    const nextCompletedTaskIds = hasTask
+      ? sessionUser.completedTaskIds.filter((id) => id !== taskId)
+      : [...sessionUser.completedTaskIds, taskId];
+
+    const nextSessionUser = {
+      ...sessionUser,
+      completedTaskIds: nextCompletedTaskIds,
+    };
+
+    const nextUsers = authUsers.map((user) => (
+      user.id === sessionUser.id
+        ? { ...user, completedTaskIds: nextCompletedTaskIds }
+        : normalizeUser(user)
+    ));
+
+    setSessionUser(nextSessionUser);
+    setAuthUsers(nextUsers);
+    writeStoredSession(nextSessionUser);
+    writeStoredUsers(nextUsers);
+  };
 
   return (
     <div className={shellClassName} ref={shellRef}>
@@ -352,7 +561,36 @@ export default function App() {
           <section className="ladder-page">
             <span className="ladder-page__eyebrow">Ладдер</span>
             <h1>Зал призванных</h1>
-            <p>Здесь будет рейтинг, прогресс и имена тех, кто пережил ритуал старта.</p>
+            <p>Локальный рейтинг по прогрессу задач. Потом это можно будет привязать к реальному аккаунту и серверным данным.</p>
+
+            <div className="ladder-board">
+              <div className="ladder-board__head">
+                <span>Игрок</span>
+                <span>Выполнено задач</span>
+                <span>Баллы</span>
+              </div>
+
+              {ladderEntries.length ? (
+                ladderEntries.map((user, index) => (
+                        <article key={user.id} className="ladder-row">
+                          <div className="ladder-row__player">
+                            <strong>{index + 1}</strong>
+                            <div>
+                              <h2>{user.nickname}</h2>
+                              <p>{user.role}</p>
+                            </div>
+                          </div>
+                    <div className="ladder-row__score">{user.completedTaskIds.length}</div>
+                    <div className="ladder-row__status">{user.score}</div>
+                  </article>
+                ))
+              ) : (
+                <div className="ladder-empty">
+                  <h2>Пока пусто</h2>
+                  <p>Как только появятся локальные профили и первые отмеченные задачи, они появятся здесь.</p>
+                </div>
+              )}
+            </div>
           </section>
         ) : showTasksPage ? (
           <section className="tasks-page">
@@ -421,11 +659,26 @@ export default function App() {
 
                     <div className="tasks-grid">
                       {group.items.map((task, index) => (
-                        <article key={task.id} className="task-card">
+                        <article
+                          key={task.id}
+                          className={`task-card${completedTaskIds.includes(task.id) ? ' task-card--completed' : ''}`}
+                        >
                           <span className="task-card__index">{String(index + 1).padStart(2, '0')}</span>
                           <span className="task-card__category">{task.categoryLabel}</span>
+                          <span className="task-card__points">{task.points} баллов</span>
                           <h3>{task.title}</h3>
                           <p>{task.description}</p>
+                          {sessionUser ? (
+                            <button
+                              type="button"
+                              className={`task-card__toggle${completedTaskIds.includes(task.id) ? ' is-active' : ''}`}
+                              onClick={() => toggleTaskCompletion(task.id)}
+                            >
+                              {completedTaskIds.includes(task.id) ? 'Засчитано' : 'Засчитать себе'}
+                            </button>
+                          ) : (
+                            <span className="task-card__hint">Войди, чтобы засчитывать задачи себе</span>
+                          )}
                         </article>
                       ))}
                     </div>
@@ -482,73 +735,173 @@ export default function App() {
             </div>
 
             <div className="auth-card">
-              <div className="auth-tabs" aria-label="Переключение формы входа">
-                <button
-                  type="button"
-                  className={authMode === 'login' ? 'is-active' : undefined}
-                  onClick={() => setAuthMode('login')}
-                >
-                  Вход
-                </button>
-                <button
-                  type="button"
-                  className={authMode === 'register' ? 'is-active' : undefined}
-                  onClick={() => setAuthMode('register')}
-                >
-                  Регистрация
-                </button>
-              </div>
-
-              {authMode === 'login' ? (
-                <form className="auth-form">
-                  <label className="auth-field">
-                    <span>Почта или ник</span>
-                    <input type="text" placeholder="Например: exile@void.ru" />
-                  </label>
-
-                  <label className="auth-field">
-                    <span>Пароль</span>
-                    <input type="password" placeholder="Введите пароль" />
-                  </label>
-
-                  <div className="auth-form__row">
-                    <label className="auth-check">
-                      <input type="checkbox" />
-                      <span>Запомнить меня</span>
-                    </label>
-                    <a href="#forgot">Забыли пароль?</a>
+              {sessionUser ? (
+                <div className="cabinet-card">
+                  <div className="cabinet-card__head">
+                    <div>
+                      <span className="cabinet-card__eyebrow">Личный кабинет</span>
+                      <h2>{sessionUser.nickname}</h2>
+                    </div>
+                    <button type="button" className="cabinet-card__logout" onClick={handleLogout}>
+                      Выйти
+                    </button>
                   </div>
 
-                  <button type="submit" className="auth-submit">
-                    Войти в лигу
-                  </button>
-                </form>
+                  <div className="cabinet-grid">
+                    <article className="cabinet-item">
+                      <span>Логин</span>
+                      <strong>{sessionUser.nickname}</strong>
+                    </article>
+                    <article className="cabinet-item">
+                      <span>Роль</span>
+                      <strong>{sessionUser.role}</strong>
+                    </article>
+                    <article className="cabinet-item">
+                      <span>Статус</span>
+                      <strong>{sessionUser.status}</strong>
+                    </article>
+                    <article className="cabinet-item">
+                      <span>Выполнено задач</span>
+                      <strong>{completedTasksCount}</strong>
+                    </article>
+                    <article className="cabinet-item">
+                      <span>Баллы</span>
+                      <strong>{completedTasksPoints}</strong>
+                    </article>
+                    <article className="cabinet-item">
+                      <span>Заметка</span>
+                      <strong>{sessionUser.note}</strong>
+                    </article>
+                  </div>
+
+                  <div className="cabinet-tasks">
+                    <div className="cabinet-tasks__head">
+                      <h3>Мои задачи</h3>
+                      <span>{completedTasksCount} / {TASKS.length}</span>
+                    </div>
+
+                    <div className="cabinet-tasks__list">
+                      {TASKS.map((task) => {
+                        const isCompleted = completedTaskIds.includes(task.id);
+
+                        return (
+                          <label key={task.id} className={`cabinet-task${isCompleted ? ' is-completed' : ''}`}>
+                            <input
+                              type="checkbox"
+                              checked={isCompleted}
+                              onChange={() => toggleTaskCompletion(task.id)}
+                            />
+                            <span className="cabinet-task__body">
+                              <strong>{task.title}</strong>
+                              <small>{task.categoryLabel} · {task.points} баллов</small>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               ) : (
-                <form className="auth-form">
-                  <label className="auth-field">
-                    <span>Ник</span>
-                    <input type="text" placeholder="Как тебя звать в лиге" />
-                  </label>
+                <>
+                  <div className="auth-tabs" aria-label="Переключение формы входа">
+                    <button
+                      type="button"
+                      className={authMode === 'login' ? 'is-active' : undefined}
+                      onClick={() => {
+                        setAuthMode('login');
+                        setAuthError('');
+                      }}
+                    >
+                      Вход
+                    </button>
+                    <button
+                      type="button"
+                      className={authMode === 'register' ? 'is-active' : undefined}
+                      onClick={() => {
+                        setAuthMode('register');
+                        setAuthError('');
+                      }}
+                    >
+                      Регистрация
+                    </button>
+                  </div>
 
-                  <label className="auth-field">
-                    <span>Почта</span>
-                    <input type="email" placeholder="name@example.com" />
-                  </label>
+                  {authMode === 'login' ? (
+                    <form className="auth-form" onSubmit={handleLoginSubmit}>
+                      <label className="auth-field">
+                        <span>Логин</span>
+                        <input
+                          type="text"
+                          placeholder="Введите логин"
+                          value={loginForm.nickname}
+                          onChange={(event) => handleLoginInputChange('nickname', event.target.value)}
+                        />
+                      </label>
 
-                  <label className="auth-field">
-                    <span>Пароль</span>
-                    <input type="password" placeholder="Придумай пароль" />
-                  </label>
+                      <label className="auth-field">
+                        <span>Пароль</span>
+                        <input
+                          type="password"
+                          placeholder="Введите пароль"
+                          value={loginForm.password}
+                          onChange={(event) => handleLoginInputChange('password', event.target.value)}
+                        />
+                      </label>
 
-                  <label className="auth-field">
-                    <span>Повтори пароль</span>
-                    <input type="password" placeholder="Еще раз тот же пароль" />
-                  </label>
+                      <div className="auth-form__row">
+                        <label className="auth-check">
+                          <input type="checkbox" defaultChecked />
+                          <span>Запомнить меня</span>
+                        </label>
+                        <a href="#forgot">Локальная демо-форма</a>
+                      </div>
 
-                  <button type="submit" className="auth-submit">
-                    Создать доступ
-                  </button>
-                </form>
+                      {authError ? <p className="auth-error">{authError}</p> : null}
+
+                      <button type="submit" className="auth-submit">
+                        Войти в лигу
+                      </button>
+                    </form>
+                  ) : (
+                    <form className="auth-form" onSubmit={handleRegisterSubmit}>
+                      <label className="auth-field">
+                        <span>Логин</span>
+                        <input
+                          type="text"
+                          placeholder="Придумай логин"
+                          value={registerForm.nickname}
+                          onChange={(event) => handleRegisterInputChange('nickname', event.target.value)}
+                        />
+                      </label>
+
+                      <label className="auth-field">
+                        <span>Пароль</span>
+                        <input
+                          type="password"
+                          placeholder="Придумай пароль"
+                          value={registerForm.password}
+                          onChange={(event) => handleRegisterInputChange('password', event.target.value)}
+                        />
+                      </label>
+
+                      <label className="auth-field">
+                        <span>Повтори пароль</span>
+                        <input
+                          type="password"
+                          placeholder="Еще раз тот же пароль"
+                          value={registerForm.confirmPassword}
+                          onChange={(event) => handleRegisterInputChange('confirmPassword', event.target.value)}
+                        />
+                      </label>
+
+                      {authError ? <p className="auth-error">{authError}</p> : null}
+
+                      <button type="submit" className="auth-submit">
+                        Создать доступ
+                      </button>
+                    </form>
+                  )}
+                </>
               )}
             </div>
           </section>
