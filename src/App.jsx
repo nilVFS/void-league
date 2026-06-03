@@ -12,12 +12,35 @@ const navigationItems = [
 ];
 
 const SCENE_TRANSITION_MS = 650;
-const AUTH_USERS_STORAGE_KEY = 'league-poe.auth.users';
-const AUTH_SESSION_STORAGE_KEY = 'league-poe.auth.session';
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 const SLOT_MACHINE_VARIANTS = [
   { count: 1, multiplier: 1.5, label: 'x1.5' },
   { count: 3, multiplier: 3, label: 'x3' },
 ];
+const BOARD_GAME_SIZE = 100;
+const BOARD_GAME_PENALTIES = {
+  4: 1,
+  8: 2,
+  14: 3,
+  27: 6,
+  39: 8,
+  46: 7,
+  52: 11,
+  68: 9,
+  74: 8,
+  83: 12,
+  93: 10,
+  97: 16,
+};
+const BOARD_GAME_CELLS = Array.from({ length: BOARD_GAME_SIZE }, (_, index) => {
+  const position = index + 1;
+  const moveBack = BOARD_GAME_PENALTIES[position] ?? 0;
+
+  return {
+    position,
+    moveBack,
+  };
+});
 
 const TASK_CATEGORIES = [
   { key: 'all', label: 'Все' },
@@ -158,6 +181,63 @@ const CLIPS = [
   },
 ];
 
+const RULE_SECTIONS = [
+  {
+    id: 'format',
+    title: 'Формат лиги',
+    items: [
+      'Это закрытая внутренняя лига, где каждый участник играет своим персонажем, но общий прогресс воспринимается как командный результат.',
+      'Главная цель сезона не просто качаться поодиночке, а совместно закрывать достижения, двигать ладдер и открывать новые игровые цели.',
+      'В личном кабинете игрок отмечает выполненные достижения, следит за своими бросками в мини-игре и обновляет профильные ссылки.',
+    ],
+  },
+  {
+    id: 'points',
+    title: 'Система баллов',
+    items: [
+      'Каждое достижение имеет собственную ценность в баллах. Чем сложнее или важнее цель для прогресса лиги, тем больше очков она приносит.',
+      'Общий счет игрока складывается из базовых баллов за выполненные достижения и дополнительных бонусов, если они были получены через игровые механики.',
+      'Ладдер сортирует участников по сумме баллов. Если счет совпадает, выше оказывается тот, кто выполнил больше достижений.',
+    ],
+  },
+  {
+    id: 'achievements',
+    title: 'Достижения',
+    items: [
+      'Список достижений разбит по категориям: старт, карты, экономика, боссы и лига. Это помогает быстро понимать, где у команды проседает темп.',
+      'Игрок может фильтровать, искать и отмечать выполненные достижения в личном кабинете, а также видеть, сколько еще целей остается открытыми.',
+      'В будущем сюда можно добавить подтверждение достижений через офицеров, скриншоты, ссылки на клипы или журнал прогресса по датам.',
+    ],
+  },
+  {
+    id: 'board-game',
+    title: 'Игра на 100 клеток',
+    items: [
+      'За каждое выполненное достижение игрок получает один бросок кубика. Броски копятся и тратятся в отдельной вкладке личного кабинета.',
+      'Игрок двигается по полю на 100 клеток. На части клеток есть штрафы: попав на них, участник откатывается назад на указанное количество шагов.',
+      'История бросков сохраняется и используется не только в кабинете, но и в popup игрока в ладдере, чтобы можно было посмотреть, как он двигался по полю.',
+    ],
+  },
+  {
+    id: 'slot-bonus',
+    title: 'Автомат и бонусы',
+    items: [
+      'Во вкладке автомата игрок может получить дополнительную выдачу задач с множителем награды. Это отдельная механика поверх обычных достижений.',
+      'Одинарная выдача дает умеренный бонус, а более рискованные наборы из нескольких задач дают усиленный множитель к очкам.',
+      'Если активная выдача еще не закрыта, новую получить нельзя. Это удерживает баланс и не дает бесконечно искать только самые удобные задачи.',
+    ],
+  },
+  {
+    id: 'ladder',
+    title: 'Что видно в ладдере',
+    items: [
+      'В таблице отображаются ник игрока, количество выполненных достижений, текущая клетка в настольной игре и общий счет.',
+      'По клику на игрока открывается popup с двумя разделами: список выполненных достижений и история его ходов в игре.',
+      'Такой формат дает быстрый обзор по рейтингу и позволяет без переходов в кабинет понять, за счет чего человек держится в топе.',
+    ],
+  },
+];
+
 const RUNES = ['ᚠ', 'ᚢ', 'ᚦ', 'ᚨ', 'ᚱ', 'ᚲ', 'ᚷ', 'ᚹ', 'ᚺ', 'ᚾ', 'ᛁ', 'ᛃ', 'ᛇ', 'ᛈ', 'ᛉ', 'ᛋ', 'ᛏ', 'ᛒ', 'ᛖ', 'ᛗ', 'ᛚ', 'ᛝ', 'ᛟ', 'ᛞ'];
 
 function buildInitialRunes(target) {
@@ -230,41 +310,39 @@ function useRuneScramble(target, options = {}) {
   return { text, isDone };
 }
 
-function readStoredUsers() {
-  try {
-    const raw = window.localStorage.getItem(AUTH_USERS_STORAGE_KEY);
+async function apiRequest(path, options = {}) {
+  const requestOptions = {
+    credentials: 'include',
+    ...options,
+    headers: {
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers ?? {}),
+    },
+  };
+  const response = await fetch(`${API_BASE_URL}${path}`, requestOptions);
+  const contentType = response.headers.get('content-type') ?? '';
+  const payload = contentType.includes('application/json')
+    ? await response.json()
+    : await response.text();
 
-    if (!raw) {
-      return [];
-    }
-
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeStoredUsers(users) {
-  window.localStorage.setItem(AUTH_USERS_STORAGE_KEY, JSON.stringify(users));
-}
-
-function readStoredSession() {
-  try {
-    const raw = window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredSession(session) {
-  if (!session) {
-    window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
-    return;
+  if (!response.ok) {
+    const detail = typeof payload === 'object' && payload?.detail
+      ? payload.detail
+      : 'Не удалось выполнить запрос.';
+    throw new Error(detail);
   }
 
-  window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
+  return payload;
+}
+
+function mergeUserList(users, nextUser) {
+  const hasUser = users.some((user) => user.id === nextUser.id);
+
+  if (hasUser) {
+    return users.map((user) => (user.id === nextUser.id ? normalizeUser(nextUser) : normalizeUser(user)));
+  }
+
+  return [...users.map((user) => normalizeUser(user)), normalizeUser(nextUser)];
 }
 
 function normalizeUser(user) {
@@ -279,6 +357,7 @@ function normalizeUser(user) {
       poeProfile: user.profileLinks?.poeProfile ?? '',
     },
     slotMachine: normalizeSlotMachine(user.slotMachine),
+    boardGame: normalizeBoardGame(user.boardGame),
   };
 }
 
@@ -318,6 +397,50 @@ function normalizeSlotRoll(roll) {
     multiplier: normalizedMultiplier,
     label: normalizedCount === 3 ? 'x3' : 'x1.5',
     rerollsUsed: roll.rerollsUsed === 1 ? 1 : 0,
+  };
+}
+
+function normalizeBoardGame(boardGame) {
+  const rawPosition = Number(boardGame?.position);
+  const rawRollsUsed = Number(boardGame?.rollsUsed);
+  const normalizedPosition = Number.isFinite(rawPosition)
+    ? Math.min(Math.max(Math.floor(rawPosition), 0), BOARD_GAME_SIZE)
+    : 0;
+  const normalizedRollsUsed = Number.isFinite(rawRollsUsed)
+    ? Math.max(Math.floor(rawRollsUsed), 0)
+    : 0;
+  const turnHistory = Array.isArray(boardGame?.turnHistory)
+    ? boardGame.turnHistory
+      .map((turn) => normalizeBoardGameTurn(turn))
+      .filter(Boolean)
+    : [];
+
+  return {
+    position: normalizedPosition,
+    rollsUsed: normalizedRollsUsed,
+    turnHistory,
+  };
+}
+
+function normalizeBoardGameTurn(turn) {
+  if (!turn || typeof turn !== 'object') {
+    return null;
+  }
+
+  const roll = Number(turn.roll);
+  const from = Number(turn.from);
+  const to = Number(turn.to);
+  const penalty = Number(turn.penalty);
+
+  if (!Number.isFinite(roll) || !Number.isFinite(from) || !Number.isFinite(to) || !Number.isFinite(penalty)) {
+    return null;
+  }
+
+  return {
+    roll: Math.min(Math.max(Math.floor(roll), 1), 6),
+    from: Math.min(Math.max(Math.floor(from), 0), BOARD_GAME_SIZE),
+    to: Math.min(Math.max(Math.floor(to), 0), BOARD_GAME_SIZE),
+    penalty: Math.max(Math.floor(penalty), 0),
   };
 }
 
@@ -469,6 +592,35 @@ function buildParticipantLinks(profileLinks) {
   ].filter((link) => link.href);
 }
 
+function extractTwitchChannel(twitchUrl) {
+  if (!twitchUrl) {
+    return '';
+  }
+
+  try {
+    const normalizedUrl = twitchUrl.startsWith('http') ? twitchUrl : `https://${twitchUrl}`;
+    const parsedUrl = new URL(normalizedUrl);
+    const segments = parsedUrl.pathname.split('/').filter(Boolean);
+
+    if (!segments.length) {
+      return '';
+    }
+
+    if (segments[0] === 'videos' || segments[0] === 'directory' || segments[0] === 'settings') {
+      return '';
+    }
+
+    return segments[0].toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+function getBoardGameAvailableRolls(user) {
+  const normalizedUser = normalizeUser(user);
+  return Math.max(normalizedUser.completedTaskIds.length - normalizedUser.boardGame.rollsUsed, 0);
+}
+
 export default function App() {
   const shellRef = useRef(null);
   const transitionTimeoutRef = useRef(null);
@@ -481,6 +633,9 @@ export default function App() {
   const [sessionUser, setSessionUser] = useState(null);
   const [authError, setAuthError] = useState('');
   const [activeClip, setActiveClip] = useState(null);
+  const [activeLadderUserId, setActiveLadderUserId] = useState(null);
+  const [ladderModalTab, setLadderModalTab] = useState('tasks');
+  const [twitchStatuses, setTwitchStatuses] = useState({});
   const [cabinetTab, setCabinetTab] = useState('tasks');
   const [cabinetTaskQuery, setCabinetTaskQuery] = useState('');
   const [cabinetTaskStatus, setCabinetTaskStatus] = useState('all');
@@ -552,13 +707,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!activeClip) {
+    if (!activeClip && !activeLadderUserId) {
       return undefined;
     }
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         setActiveClip(null);
+        setActiveLadderUserId(null);
       }
     };
 
@@ -567,12 +723,37 @@ export default function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [activeClip]);
+  }, [activeClip, activeLadderUserId]);
 
   useEffect(() => {
-    setAuthUsers(readStoredUsers().map(normalizeUser));
-    const storedSession = readStoredSession();
-    setSessionUser(storedSession ? normalizeUser(storedSession) : null);
+    let isCancelled = false;
+
+    const loadBootstrapData = async () => {
+      try {
+        const [ladderResponse, meResponse] = await Promise.all([
+          apiRequest('/ladder').catch(() => []),
+          apiRequest('/me').catch(() => null),
+        ]);
+
+        if (isCancelled) {
+          return;
+        }
+
+        setAuthUsers(Array.isArray(ladderResponse) ? ladderResponse.map(normalizeUser) : []);
+        setSessionUser(meResponse ? normalizeUser(meResponse) : null);
+      } catch {
+        if (!isCancelled) {
+          setAuthUsers([]);
+          setSessionUser(null);
+        }
+      }
+    };
+
+    loadBootstrapData();
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   const startSceneTransition = (nextView) => {
@@ -654,6 +835,17 @@ export default function App() {
   const slotBonusPoints = sessionUser ? getSlotBonusPoints(sessionUser) : 0;
   const totalScore = completedTasksPoints + slotBonusPoints;
   const activeSlotRoll = sessionUser?.slotMachine?.activeRoll ?? null;
+  const boardGameState = sessionUser?.boardGame ?? normalizeBoardGame();
+  const boardGamePosition = boardGameState.position;
+  const boardGameTurnHistory = boardGameState.turnHistory;
+  const availableBoardRolls = sessionUser ? getBoardGameAvailableRolls(sessionUser) : 0;
+  const boardProgress = Math.round((boardGamePosition / BOARD_GAME_SIZE) * 100);
+  const boardGameRows = useMemo(() => Array.from({ length: 10 }, (_, rowIndex) => {
+    const base = rowIndex * 10;
+    const rowCells = BOARD_GAME_CELLS.slice(base, base + 10);
+
+    return rowIndex % 2 === 0 ? [...rowCells].reverse() : rowCells;
+  }).reverse(), []);
   const availableSlotTasks = TASKS.filter((task) => !completedTaskIds.includes(task.id));
   const availableSlotCategoryCount = countDistinctCategories(availableSlotTasks);
   const slotRollTasks = activeSlotRoll
@@ -676,6 +868,7 @@ export default function App() {
       return {
         ...normalizedUser,
         score: getTotalScore(normalizedUser),
+        boardPosition: normalizedUser.boardGame.position,
       };
     })
     .sort((left, right) => {
@@ -697,6 +890,7 @@ export default function App() {
         ...normalizedUser,
         score: getTotalScore(normalizedUser),
         links: buildParticipantLinks(normalizedUser.profileLinks),
+        twitchChannel: extractTwitchChannel(normalizedUser.profileLinks?.twitch),
       };
     })
     .sort((left, right) => left.nickname.localeCompare(right.nickname, 'ru')), [authUsers]);
@@ -718,6 +912,17 @@ export default function App() {
       items: cabinetFilteredTasks.filter((task) => task.category === category.key),
     }))
     .filter((group) => group.items.length > 0), [cabinetFilteredTasks]);
+  const activeLadderUser = useMemo(() => (
+    activeLadderUserId
+      ? ladderEntries.find((user) => user.id === activeLadderUserId) ?? null
+      : null
+  ), [activeLadderUserId, ladderEntries]);
+  const activeLadderUserTasks = useMemo(() => (
+    activeLadderUser
+      ? TASKS.filter((task) => activeLadderUser.completedTaskIds.includes(task.id))
+      : []
+  ), [activeLadderUser]);
+  const activeLadderUserTurns = activeLadderUser?.boardGame.turnHistory ?? [];
 
   const handleLoginInputChange = (field, value) => {
     setLoginForm((current) => ({ ...current, [field]: value }));
@@ -729,95 +934,101 @@ export default function App() {
     setAuthError('');
   };
 
-  const handleLoginSubmit = (event) => {
+  const handleLoginSubmit = async (event) => {
     event.preventDefault();
 
-    const nickname = loginForm.nickname.trim().toLowerCase();
-    const password = loginForm.password;
-    const user = authUsers.find((entry) => entry.nickname.toLowerCase() === nickname);
+    try {
+      const response = await apiRequest('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          nickname: loginForm.nickname.trim(),
+          password: loginForm.password,
+        }),
+      });
 
-    if (!user || user.password !== password) {
-      setAuthError('Не нашли такого пользователя или пароль не совпадает.');
-      return;
+      const normalizedUser = normalizeUser(response.user);
+      setSessionUser(normalizedUser);
+      setAuthUsers((current) => mergeUserList(current, normalizedUser));
+      setAuthError('');
+      setLoginForm({ nickname: '', password: '' });
+    } catch (error) {
+      setAuthError(error.message);
     }
-
-    const normalizedUser = normalizeUser(user);
-    setSessionUser(normalizedUser);
-    writeStoredSession(normalizedUser);
-    setAuthError('');
-    setLoginForm({ nickname: '', password: '' });
   };
 
-  const handleRegisterSubmit = (event) => {
+  const handleRegisterSubmit = async (event) => {
     event.preventDefault();
 
-    const nickname = registerForm.nickname.trim();
-    const password = registerForm.password;
-    const confirmPassword = registerForm.confirmPassword;
+    try {
+      const response = await apiRequest('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          nickname: registerForm.nickname.trim(),
+          password: registerForm.password,
+          confirmPassword: registerForm.confirmPassword,
+        }),
+      });
 
-    if (!nickname || !password) {
-      setAuthError('Заполни логин и пароль.');
-      return;
+      const normalizedUser = normalizeUser(response.user);
+      setAuthUsers((current) => mergeUserList(current, normalizedUser));
+      setSessionUser(normalizedUser);
+      setAuthError('');
+      setRegisterForm({
+        nickname: '',
+        password: '',
+        confirmPassword: '',
+      });
+    } catch (error) {
+      setAuthError(error.message);
     }
-
-    if (password !== confirmPassword) {
-      setAuthError('Пароли не совпадают.');
-      return;
-    }
-
-    if (authUsers.some((user) => user.nickname.toLowerCase() === nickname.toLowerCase())) {
-      setAuthError('Пользователь с таким логином уже существует.');
-      return;
-    }
-
-    const nextUser = {
-      id: `user-${Date.now()}`,
-      nickname,
-      password,
-      completedTaskIds: [],
-      profileLinks: {
-        twitch: '',
-        poeNinja: '',
-        poeProfile: '',
-      },
-      slotMachine: normalizeSlotMachine(),
-    };
-
-    const nextUsers = [...authUsers, nextUser];
-    setAuthUsers(nextUsers);
-    writeStoredUsers(nextUsers);
-    setSessionUser(nextUser);
-    writeStoredSession(nextUser);
-    setAuthError('');
-    setRegisterForm({
-      nickname: '',
-      password: '',
-      confirmPassword: '',
-    });
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await apiRequest('/auth/logout', { method: 'POST' });
+    } catch {
+      // Ignore logout transport issues and clear client state anyway.
+    }
+
     setSessionUser(null);
-    writeStoredSession(null);
   };
 
-  const updateSessionUser = (updater) => {
+  const updateSessionUser = async (updater) => {
     if (!sessionUser) {
-      return;
+      return null;
     }
 
+    const previousSessionUser = sessionUser;
     const nextSessionUser = normalizeUser(
       typeof updater === 'function' ? updater(sessionUser) : updater,
     );
 
-    const nextUsers = authUsers.map((user) => (
-      user.id === sessionUser.id ? nextSessionUser : normalizeUser(user)
-    ));
-
     setSessionUser(nextSessionUser);
-    setAuthUsers(nextUsers);
-    writeStoredSession(nextSessionUser);
-    writeStoredUsers(nextUsers);
+    setAuthUsers((current) => mergeUserList(current, nextSessionUser));
+
+    try {
+      const response = await apiRequest('/me', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          completedTaskIds: nextSessionUser.completedTaskIds,
+          status: nextSessionUser.status,
+          note: nextSessionUser.note,
+          profileLinks: nextSessionUser.profileLinks,
+          slotMachine: nextSessionUser.slotMachine,
+          boardGame: nextSessionUser.boardGame,
+        }),
+      });
+      const normalizedUser = normalizeUser(response);
+      setSessionUser(normalizedUser);
+      setAuthUsers((current) => mergeUserList(current, normalizedUser));
+      setAuthError('');
+      return normalizedUser;
+    } catch (error) {
+      setSessionUser(previousSessionUser);
+      setAuthUsers((current) => mergeUserList(current, previousSessionUser));
+      setAuthError(error.message);
+      return null;
+    }
   };
 
   useEffect(() => {
@@ -833,6 +1044,61 @@ export default function App() {
 
     updateSessionUser(resolvedUser);
   }, [sessionUser]);
+
+  useEffect(() => {
+    if (activeView !== 'participants') {
+      return undefined;
+    }
+
+    const channels = [...new Set(
+      participantEntries
+        .map((user) => user.twitchChannel)
+        .filter(Boolean),
+    )];
+
+    if (!channels.length) {
+      setTwitchStatuses({});
+      return undefined;
+    }
+
+    let isCancelled = false;
+
+    const loadStatuses = async () => {
+      const nextStatuses = {};
+
+      await Promise.all(channels.map(async (channel) => {
+        try {
+          const response = await fetch(`https://decapi.me/twitch/uptime/${encodeURIComponent(channel)}`);
+          const text = (await response.text()).trim().toLowerCase();
+          const isOnline = response.ok
+            && text
+            && text !== `${channel} is offline`
+            && text !== 'offline'
+            && !text.includes('could not resolve channel');
+
+          nextStatuses[channel] = {
+            state: isOnline ? 'online' : 'offline',
+          };
+        } catch {
+          nextStatuses[channel] = {
+            state: 'unknown',
+          };
+        }
+      }));
+
+      if (!isCancelled) {
+        setTwitchStatuses(nextStatuses);
+      }
+    };
+
+    loadStatuses();
+    const intervalId = window.setInterval(loadStatuses, 60000);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activeView, participantEntries]);
 
   const toggleTaskCompletion = (taskId) => {
     if (!sessionUser) {
@@ -906,6 +1172,50 @@ export default function App() {
     });
   };
 
+  const handleBoardGameRoll = () => {
+    if (!sessionUser || availableBoardRolls <= 0 || boardGamePosition >= BOARD_GAME_SIZE) {
+      return;
+    }
+
+    const roll = Math.floor(Math.random() * 6) + 1;
+    const from = boardGamePosition;
+    const advancedTo = Math.min(from + roll, BOARD_GAME_SIZE);
+    const penalty = BOARD_GAME_PENALTIES[advancedTo] ?? 0;
+    const to = Math.max(advancedTo - penalty, 0);
+
+    updateSessionUser({
+      ...sessionUser,
+      boardGame: {
+        position: to,
+        rollsUsed: boardGameState.rollsUsed + 1,
+        turnHistory: [
+          {
+            roll,
+            from,
+            to,
+            penalty,
+          },
+          ...boardGameTurnHistory,
+        ].slice(0, 12),
+      },
+    });
+  };
+
+  const boardGameHistoryItems = boardGameTurnHistory.length
+    ? boardGameTurnHistory.map((turn, index) => ({
+      id: `turn-${index}-${turn.from}-${turn.to}-${turn.roll}`,
+      label: `Бросок ${boardGameState.rollsUsed - index}`,
+      ...turn,
+    }))
+    : [];
+  const ladderModalHistoryItems = activeLadderUserTurns.length
+    ? activeLadderUserTurns.map((turn, index) => ({
+      id: `ladder-turn-${index}-${turn.from}-${turn.to}-${turn.roll}`,
+      label: `Бросок ${activeLadderUser.boardGame.rollsUsed - index}`,
+      ...turn,
+    }))
+    : [];
+
   const buildClipEmbedUrl = (slug) => `https://clips.twitch.tv/embed?clip=${slug}&parent=${window.location.hostname || 'localhost'}`;
 
   return (
@@ -946,12 +1256,21 @@ export default function App() {
               <div className="ladder-board__head">
                 <span>Игрок</span>
                 <span>Выполнено задач</span>
+                <span>Клетка</span>
                 <span>Баллы</span>
               </div>
 
               {ladderEntries.length ? (
                 ladderEntries.map((user, index) => (
-                        <article key={user.id} className="ladder-row">
+                        <button
+                          key={user.id}
+                          type="button"
+                          className="ladder-row ladder-row--button"
+                          onClick={() => {
+                            setActiveLadderUserId(user.id);
+                            setLadderModalTab('tasks');
+                          }}
+                        >
                           <div className="ladder-row__player">
                             <strong>{index + 1}</strong>
                             <div>
@@ -959,8 +1278,9 @@ export default function App() {
                             </div>
                           </div>
                     <div className="ladder-row__score">{user.completedTaskIds.length}</div>
+                    <div className="ladder-row__cell">{user.boardPosition || 'Старт'}</div>
                     <div className="ladder-row__status">{formatPoints(user.score)}</div>
-                  </article>
+                  </button>
                 ))
               ) : (
                 <div className="ladder-empty">
@@ -1081,8 +1401,14 @@ export default function App() {
             <div className="participants-grid">
               {participantEntries.length ? (
                 participantEntries.map((user) => (
-                  <article key={user.id} className="participant-card">
+                  <article
+                    key={user.id}
+                    className={`participant-card${twitchStatuses[user.twitchChannel]?.state === 'online' ? ' participant-card--online' : ''}`}
+                  >
                     <div className="participant-card__head">
+                      {twitchStatuses[user.twitchChannel]?.state === 'online' ? (
+                        <span className="participant-card__live">Онлайн на Twitch</span>
+                      ) : null}
                       <h2>{user.nickname}</h2>
                     </div>
 
@@ -1186,10 +1512,27 @@ export default function App() {
             ) : null}
           </section>
         ) : showRulesPage ? (
-          <section className="ladder-page">
+          <section className="ladder-page rules-page">
             <span className="ladder-page__eyebrow">Правила</span>
             <h1>Кодекс круга</h1>
-            <p>Здесь потом соберем обязательные правила поведения, спорные кейсы и порядок участия в закрытом составе.</p>
+            <p>Это временное демо-наполнение, чтобы посмотреть, как на странице будут выглядеть реальные правила, договоренности и внутренние регламенты лиги.</p>
+
+            <div className="rules-grid">
+              {RULE_SECTIONS.map((section, index) => (
+                <article key={section.id} className="rules-card">
+                  <div className="rules-card__head">
+                    <span>{String(index + 1).padStart(2, '0')}</span>
+                    <h2>{section.title}</h2>
+                  </div>
+
+                  <div className="rules-card__list">
+                    {section.items.map((item) => (
+                      <p key={item}>{item}</p>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
           </section>
         ) : showLoginPage ? (
           <section className={`auth-page${sessionUser ? ' auth-page--cabinet' : ''}`}>
@@ -1220,6 +1563,13 @@ export default function App() {
                     </button>
                     <button
                       type="button"
+                      className={cabinetTab === 'board' ? 'is-active' : undefined}
+                      onClick={() => setCabinetTab('board')}
+                    >
+                      Игра
+                    </button>
+                    <button
+                      type="button"
                       className={cabinetTab === 'profile' ? 'is-active' : undefined}
                       onClick={() => setCabinetTab('profile')}
                     >
@@ -1239,6 +1589,10 @@ export default function App() {
                     <article className="cabinet-item">
                       <span>Бонус слота</span>
                       <strong>{formatPoints(slotBonusPoints)}</strong>
+                    </article>
+                    <article className="cabinet-item">
+                      <span>Бросков в запасе</span>
+                      <strong>{availableBoardRolls}</strong>
                     </article>
                   </div>
 
@@ -1469,6 +1823,108 @@ export default function App() {
                       )}
                     </section>
                   </div>
+                ) : cabinetTab === 'board' ? (
+                  <div className="cabinet-tasks">
+                    <div className="cabinet-tasks__head">
+                      <div>
+                        <span className="cabinet-card__eyebrow">Настольная игра</span>
+                        <h3>Путь на 100 клеток</h3>
+                      </div>
+                      <span>{boardGamePosition} / {BOARD_GAME_SIZE}</span>
+                    </div>
+
+                    <section className="board-game">
+                      <div className="board-game__hero">
+                        <div className="board-game__copy">
+                          <span className="slot-machine__eyebrow">Броски за достижения</span>
+                          <h4>Каждое выполненное достижение дает 1 бросок кубика</h4>
+                          <p>
+                            Доходишь до клетки, бросаешь кубик и двигаешься вперед.
+                            Но некоторые клетки нестабильны и отбрасывают назад на несколько шагов.
+                          </p>
+                        </div>
+
+                        <span className="board-game__hint">
+                          {availableBoardRolls > 0
+                            ? `Доступно бросков: ${availableBoardRolls}`
+                            : 'Сначала выполни новое достижение, чтобы получить бросок.'}
+                        </span>
+                      </div>
+
+                      <div className="board-game__stats">
+                        <article className="slot-machine__stat">
+                          <span>Текущая клетка</span>
+                          <strong>{boardGamePosition || 'Старт'}</strong>
+                        </article>
+                        <article className="slot-machine__stat">
+                          <span>Прогресс</span>
+                          <strong>{boardProgress}%</strong>
+                        </article>
+                        <article className="slot-machine__stat">
+                          <span>Бросков потрачено</span>
+                          <strong>{boardGameState.rollsUsed}</strong>
+                        </article>
+                      </div>
+
+                      <div className="board-game__controls">
+                        <button
+                          type="button"
+                          className="slot-machine__button board-game__button"
+                          onClick={handleBoardGameRoll}
+                          disabled={availableBoardRolls <= 0 || boardGamePosition >= BOARD_GAME_SIZE}
+                        >
+                          {boardGamePosition >= BOARD_GAME_SIZE ? 'Финиш достигнут' : 'Бросить кубик'}
+                        </button>
+                      </div>
+
+                      <div className="board-game__layout">
+                        <div className="board-game__grid" aria-label="Игровое поле на 100 клеток">
+                          {boardGameRows.map((row, rowIndex) => (
+                            <div key={`row-${rowIndex}`} className="board-game__row">
+                              {row.map((cell) => {
+                                const isPlayer = cell.position === boardGamePosition && boardGamePosition > 0;
+                                const isPenalty = cell.moveBack > 0;
+                                const isPassed = cell.position < boardGamePosition;
+
+                                return (
+                                  <article
+                                    key={cell.position}
+                                    className={`board-cell${isPenalty ? ' board-cell--penalty' : ''}${isPlayer ? ' board-cell--player' : ''}${isPassed ? ' board-cell--passed' : ''}`}
+                                  >
+                                    <span className="board-cell__position">{cell.position}</span>
+                                    {isPenalty ? <small>-{cell.moveBack}</small> : null}
+                                    {isPlayer ? <strong>Вы</strong> : null}
+                                  </article>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="board-game__turn">
+                        <span className="slot-machine__label">История ходов</span>
+                        {boardGameHistoryItems.length ? (
+                          <div className="board-game__history">
+                            {boardGameHistoryItems.map((turn) => (
+                              <article key={turn.id} className="board-game__history-item">
+                                <strong>{turn.label}</strong>
+                                <p>
+                                  Кубик: {turn.roll}. С {turn.from || 'старта'} до {turn.to}.
+                                  {turn.penalty ? ` Откат на ${turn.penalty}.` : ' Без отката.'}
+                                </p>
+                              </article>
+                            ))}
+                          </div>
+                        ) : (
+                          <>
+                            <h4>Ходов еще не было</h4>
+                            <p>Первый бросок станет доступен сразу после первого выполненного достижения.</p>
+                          </>
+                        )}
+                      </div>
+                    </section>
+                  </div>
                 ) : (
                   <div className="cabinet-tasks">
                     <div className="cabinet-tasks__head">
@@ -1507,7 +1963,7 @@ export default function App() {
                 <div className="auth-page__head">
                   <span className="ladder-page__eyebrow">Войти</span>
                   <h1>Вход в святилище</h1>
-                  <p>Пока без бэкенда, но уже с понятной формой: вход для своих и регистрация для новых участников лиги.</p>
+                  <p>Авторизация теперь идет через бэкенд: регистрация, вход и прогресс игрока больше не живут в localStorage.</p>
                 </div>
 
                   <div className="auth-tabs" aria-label="Переключение формы входа">
@@ -1554,14 +2010,6 @@ export default function App() {
                           onChange={(event) => handleLoginInputChange('password', event.target.value)}
                         />
                       </label>
-
-                      <div className="auth-form__row">
-                        <label className="auth-check">
-                          <input type="checkbox" defaultChecked />
-                          <span>Запомнить меня</span>
-                        </label>
-                        <a href="#forgot">Локальная демо-форма</a>
-                      </div>
 
                       {authError ? <p className="auth-error">{authError}</p> : null}
 
@@ -1651,6 +2099,108 @@ export default function App() {
           </section>
         ) : null}
       </main>
+
+      {activeLadderUser ? (
+        <div
+          className="clip-modal"
+          role="presentation"
+          onClick={() => setActiveLadderUserId(null)}
+        >
+          <div
+            className="clip-modal__dialog ladder-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ladder-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="clip-modal__close"
+              onClick={() => setActiveLadderUserId(null)}
+              aria-label="Закрыть карточку участника"
+            >
+              Закрыть
+            </button>
+
+            <div className="clip-modal__meta">
+              <span>Профиль игрока</span>
+              <h2 id="ladder-modal-title">{activeLadderUser.nickname}</h2>
+            </div>
+
+            <div className="ladder-modal__stats">
+              <article className="slot-machine__stat">
+                <span>Выполнено задач</span>
+                <strong>{activeLadderUser.completedTaskIds.length}</strong>
+              </article>
+              <article className="slot-machine__stat">
+                <span>Клетка</span>
+                <strong>{activeLadderUser.boardPosition || 'Старт'}</strong>
+              </article>
+              <article className="slot-machine__stat">
+                <span>Баллы</span>
+                <strong>{formatPoints(activeLadderUser.score)}</strong>
+              </article>
+            </div>
+
+            <div className="ladder-modal__tabs" aria-label="Разделы карточки игрока">
+              <button
+                type="button"
+                className={ladderModalTab === 'tasks' ? 'is-active' : undefined}
+                onClick={() => setLadderModalTab('tasks')}
+              >
+                Достижения
+              </button>
+              <button
+                type="button"
+                className={ladderModalTab === 'history' ? 'is-active' : undefined}
+                onClick={() => setLadderModalTab('history')}
+              >
+                История игры
+              </button>
+            </div>
+
+            {ladderModalTab === 'tasks' ? (
+              activeLadderUserTasks.length ? (
+                <div className="ladder-modal__list">
+                  {activeLadderUserTasks.map((task) => (
+                    <article key={task.id} className="ladder-modal__item">
+                      <div className="ladder-modal__item-head">
+                        <span>{task.categoryLabel}</span>
+                        <strong>{task.points} баллов</strong>
+                      </div>
+                      <h3>{task.title}</h3>
+                      <p>{task.description}</p>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="ladder-modal__empty">
+                  <h3>Пока без достижений</h3>
+                  <p>У этого игрока еще нет отмеченных выполненных задач.</p>
+                </div>
+              )
+            ) : ladderModalHistoryItems.length ? (
+              <div className="ladder-modal__list">
+                {ladderModalHistoryItems.map((turn) => (
+                  <article key={turn.id} className="ladder-modal__item">
+                    <div className="ladder-modal__item-head">
+                      <span>{turn.label}</span>
+                      <strong>Кубик: {turn.roll}</strong>
+                    </div>
+                    <h3>С {turn.from || 'старта'} до {turn.to}</h3>
+                    <p>{turn.penalty ? `Попал на штрафную клетку и откатился на ${turn.penalty}.` : 'Ход прошел без отката.'}</p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="ladder-modal__empty">
+                <h3>Ходов еще не было</h3>
+                <p>История появится после первых бросков в игре.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
